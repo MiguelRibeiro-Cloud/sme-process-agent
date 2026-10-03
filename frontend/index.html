@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="An observable AI agent for SME process discovery.">
+    <title>SME Process Discovery Agent</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="product-header">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 28 28" role="img">
+              <path d="M7 8.5h6M15 8.5h6M7 19.5h6M15 19.5h6M9.5 8.5v11M18.5 8.5v11" />
+              <circle cx="7" cy="8.5" r="2" />
+              <circle cx="21" cy="8.5" r="2" />
+              <circle cx="7" cy="19.5" r="2" />
+              <circle cx="21" cy="19.5" r="2" />
+            </svg>
+          </div>
+          <div>
+            <h1>SME Process Discovery Agent</h1>
+            <p>Northstar fictional demo &middot; synthetic business data</p>
+          </div>
+        </div>
+
+        <div class="header-meta" aria-label="Runtime architecture status">
+          <span class="availability"><i></i>System ready</span>
+          <span class="model-chip"><span>Model</span> <strong id="runtime-model">Loading…</strong></span>
+          <details class="mcp-status" id="mcp-status">
+            <summary><i></i><span id="mcp-status-label">MCP: Connecting</span></summary>
+            <div class="mcp-status-details">
+              <strong id="mcp-server-name">Northstar Business Systems</strong>
+              <span id="mcp-transport">stdio</span>
+              <ul class="capability-list" id="mcp-tool-list"></ul>
+            </div>
+          </details>
+          <details class="mcp-status knowledge-status" id="rag-status">
+            <summary><i></i><span id="rag-status-label">Knowledge: Checking</span></summary>
+            <div class="mcp-status-details">
+              <strong>Northstar company documents</strong>
+              <span id="rag-model">Embedding model: checking</span>
+              <span id="rag-index-detail">Index status unavailable</span>
+              <ul class="catalog-list" id="knowledge-catalog" aria-label="Indexed document catalogue"></ul>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <main>
+        <section class="workspace" aria-label="Agent workspace">
+          <article class="panel conversation-panel">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">Workspace</p>
+                <h2>Conversation</h2>
+              </div>
+              <span class="panel-label" id="session-label">Ready</span>
+            </header>
+
+            <details class="demo-guide" id="demo-guide">
+              <summary>
+                <span><strong>Demo Guide</strong> <small>How to explore this demo</small></span>
+                <span class="guide-toggle" aria-hidden="true"></span>
+              </summary>
+              <div class="demo-guide-body">
+                <div class="guide-introduction">
+                  <p>You&rsquo;re interviewing employees at Northstar, a fictional industrial company, to understand how a business process really works. The agent can investigate connected systems and company documentation while building a structured process model.</p>
+                  <p class="demo-disclosure"><strong>Demo environment:</strong> CRM, pricing and company documents contain synthetic data.</p>
+                  <p><strong>Describe how work actually happens</strong> &mdash; including manual steps, delays, exceptions, approvals and workarounds.</p>
+                </div>
+
+                <section class="guide-section" aria-labelledby="demo-journey-title">
+                  <div class="guide-heading">
+                    <h3 id="demo-journey-title">Recommended journey</h3>
+                    <span>Suggestions fill the composer only</span>
+                  </div>
+                  <div class="prompt-suggestion-list">
+                    <button class="prompt-suggestion" type="button" data-prompt="My sales team takes too long to build quotes." aria-label="Fill composer with the start discovery prompt">
+                      <span class="suggestion-index">A</span>
+                      <span><strong>Start discovery</strong><q>My sales team takes too long to build quotes.</q><small>Watch process discovery and structured state capture begin.</small></span>
+                    </button>
+                    <button class="prompt-suggestion" type="button" data-prompt="We only ask our Sales Manager for approval when discounts are above 15%." aria-label="Fill composer with the real-world practice prompt">
+                      <span class="suggestion-index">B</span>
+                      <span><strong>Introduce real-world practice</strong><q>We only ask our Sales Manager for approval when discounts are above 15%.</q><small>See reported practice compared with company knowledge.</small></span>
+                    </button>
+                    <button class="prompt-suggestion" type="button" data-prompt="Who owns Acme Ltd?" aria-label="Fill composer with the MCP capability prompt">
+                      <span class="suggestion-index">C</span>
+                      <span><strong>Exercise MCP</strong><q>Who owns Acme Ltd?</q><small>Watch the agent discover and call the CRM capability.</small></span>
+                    </button>
+                    <button class="prompt-suggestion" type="button" data-prompt="What does company policy say about a 15% discount?" aria-label="Fill composer with the RAG retrieval prompt">
+                      <span class="suggestion-index">D</span>
+                      <span><strong>Exercise RAG</strong><q>What does company policy say about a 15% discount?</q><small>Watch semantic retrieval from indexed Northstar documents.</small></span>
+                    </button>
+                  </div>
+                </section>
+
+                <section class="guide-section" aria-labelledby="watching-title">
+                  <div class="guide-heading">
+                    <h3 id="watching-title">What you&rsquo;re watching</h3>
+                    <span>Plain-English architecture</span>
+                  </div>
+                  <dl class="architecture-legend">
+                    <div><dt>Conversation</dt><dd>The GPT model interviews the SME and decides the next action.</dd></div>
+                    <div><dt>Process Model</dt><dd>Application-owned structured knowledge extracted from discovery.</dd></div>
+                    <div><dt>MCP</dt><dd>Interact with structured business systems and tools.</dd></div>
+                    <div><dt>Knowledge / RAG</dt><dd>Search unstructured company knowledge semantically.</dd></div>
+                    <div><dt>Analysis</dt><dd>Application-controlled Analyst &rarr; Designer &rarr; Verifier orchestration.</dd></div>
+                    <div><dt>Evaluation</dt><dd>Offline behavioral regression testing of the AI system.</dd></div>
+                  </dl>
+                </section>
+
+                <div class="guide-observability">
+                  <p>Keep an eye on <strong>Agent Activity</strong> to see whether a turn uses the LLM alone, MCP, RAG, state extraction or orchestration.</p>
+                  <p>Once enough process knowledge is captured, run <strong>Analyze discovered process</strong> to see Analyst &rarr; Designer &rarr; Verifier orchestration.</p>
+                </div>
+
+                <details class="architecture-details">
+                  <summary>Architecture</summary>
+                  <div class="architecture-diagram" aria-label="Browser to FastAPI to GPT model, connected to MCP, RAG, ProcessState and analysis orchestration">
+                    <div><span>Browser</span><i>&darr;</i><span>FastAPI</span><i>&darr;</i><span>GPT model</span></div>
+                    <ul>
+                      <li><strong>MCP client</strong> &rarr; Northstar MCP server &rarr; CRM / Pricing</li>
+                      <li><strong>RAG</strong> &rarr; embedding model &rarr; local vector index &rarr; company documents</li>
+                      <li><strong>ProcessState</strong> &rarr; application-owned structured process knowledge</li>
+                    </ul>
+                    <div><span>Analyst</span><i>&rarr;</i><span>Designer</span><i>&rarr;</i><span>Verifier</span></div>
+                  </div>
+                </details>
+              </div>
+            </details>
+
+            <div class="conversation-body" id="conversation" aria-live="polite" aria-busy="false">
+              <div class="conversation-intro" id="conversation-intro">
+                <div class="agent-orb" aria-hidden="true">
+                  <span></span>
+                </div>
+                <div>
+                  <h3>Interview the Northstar team</h3>
+                  <p>Describe a messy process as it really works. The agent will ask questions and the execution trace will show what happens underneath.</p>
+                  <button class="demo-prompt" id="demo-prompt" type="button">Try the demo: “My sales team takes too long to build quotes.”</button>
+                </div>
+              </div>
+            </div>
+
+            <footer class="conversation-footer">
+              <form class="conversation-composer" id="chat-form">
+                <label class="visually-hidden" for="message-input">Message the discovery agent</label>
+                <textarea
+                  id="message-input"
+                  name="message"
+                  rows="1"
+                  maxlength="4000"
+                  placeholder="Describe how work actually happens…"
+                  autocomplete="off"
+                  required
+                ></textarea>
+                <button class="primary-button" id="send-button" type="submit">
+                  <span class="button-icon" aria-hidden="true">
+                    <svg viewBox="0 0 20 20"><path d="m4 4 13 6-13 6 2-6-2-6Zm2.9 5h5.6L6.3 6.1 6.9 9Zm-.6 4.9 6.2-2.9H6.9l-.6 2.9Z" /></svg>
+                  </span>
+                  <span id="send-button-label">Send</span>
+                </button>
+              </form>
+              <div class="composer-meta">
+                <span>Enter to send · Shift + Enter for a new line</span>
+                <span id="action-hint">Ready for a message</span>
+              </div>
+            </footer>
+          </article>
+
+          <aside class="panel activity-panel" aria-labelledby="activity-title">
+            <header class="panel-header activity-header">
+              <div>
+                <p class="eyebrow">Live execution trace</p>
+                <h2 id="activity-title">Agent activity</h2>
+              </div>
+              <span class="connection-state idle" id="connection-state">
+                <i></i><span>Idle</span>
+              </span>
+            </header>
+
+            <div class="activity-body" id="activity-feed" aria-live="polite" aria-busy="false">
+              <div class="activity-empty" id="activity-empty">
+                <div class="trace-preview" aria-hidden="true">
+                  <span></span><span></span><span></span>
+                </div>
+                <h3>Execution events will appear here</h3>
+                <p>Each item is emitted by the backend in real time. No simulated steps.</p>
+              </div>
+            </div>
+
+            <footer class="activity-footer">
+              <span><i class="legend-dot live"></i>Live backend events</span>
+              <span id="event-count">0 events</span>
+            </footer>
+          </aside>
+        </section>
+
+        <section class="process-section" aria-labelledby="process-title">
+          <header class="process-header">
+            <div>
+              <p class="eyebrow">Structured knowledge</p>
+              <h2 id="process-title">Process model</h2>
+            </div>
+            <div class="process-actions">
+              <span class="process-status" id="process-status">Awaiting discovery</span>
+              <button class="analyze-button" id="analyze-process" type="button" disabled>Analyze discovered process</button>
+              <p class="analysis-helper">Run the discovered AS-IS process through Process Analyst &rarr; Automation Designer &rarr; Evidence Verifier.</p>
+              <button class="reset-button" id="reset-discovery" type="button">Reset discovery</button>
+            </div>
+          </header>
+
+          <div class="process-content" id="process-content">
+            <div class="process-empty" id="process-empty">
+              <div class="empty-symbol" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M6 7.5h5m2 0h5M6 16.5h5m2 0h5M8.5 7.5v9m7-9v9" /><circle cx="5" cy="7.5" r="1.5" /><circle cx="19" cy="7.5" r="1.5" /><circle cx="5" cy="16.5" r="1.5" /><circle cx="19" cy="16.5" r="1.5" /></svg>
+              </div>
+              <div>
+                <h3>No process knowledge captured yet</h3>
+                <p>Validated facts and open questions will accumulate here as discovery progresses.</p>
+              </div>
+            </div>
+
+            <div class="process-model" id="process-model" hidden>
+              <div class="process-name-block">
+                <span>Process</span>
+                <h3 id="process-name">Unnamed process</h3>
+              </div>
+              <div class="knowledge-grid">
+                <section class="knowledge-card" data-field="actors"><h3><span class="category-icon actors">A</span>Actors</h3><div class="knowledge-list"></div></section>
+                <section class="knowledge-card" data-field="systems"><h3><span class="category-icon systems">S</span>Systems</h3><div class="knowledge-list"></div></section>
+                <section class="knowledge-card flow-card" data-field="flow"><h3><span class="category-icon steps">Fl</span>Process flow</h3><div class="knowledge-list process-flow-list"></div></section>
+                <section class="knowledge-card" data-field="pain_points"><h3><span class="category-icon pain-points">!</span>Pain points</h3><div class="knowledge-list"></div></section>
+                <section class="knowledge-card" data-field="evidence"><h3><span class="category-icon evidence">E</span>Evidence</h3><div class="knowledge-list"></div></section>
+                <section class="knowledge-card conflict-card" data-field="conflicts"><h3><span class="category-icon conflicts">!</span>Conflicts</h3><div class="knowledge-list"></div></section>
+                <section class="knowledge-card" data-field="unknowns"><h3><span class="category-icon unknowns">?</span>Unknowns</h3><div class="knowledge-list"></div></section>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="analysis-section" id="analysis-section" aria-labelledby="analysis-title">
+          <header class="analysis-header">
+            <div>
+              <p class="eyebrow">Application-controlled orchestration</p>
+              <h2 id="analysis-title">Process Analysis &amp; Automation Proposal</h2>
+            </div>
+            <span class="process-status" id="analysis-status">Not analyzed</span>
+          </header>
+
+          <div class="analysis-empty" id="analysis-empty">
+            <div class="empty-symbol" aria-hidden="true">A</div>
+            <div>
+              <h3>No orchestration result yet</h3>
+              <p>After discovery captures process knowledge, run the explicit analysis to produce and verify a TO-BE proposal.</p>
+            </div>
+          </div>
+
+          <div class="analysis-content" id="analysis-content" hidden>
+            <div class="stale-notice" id="analysis-stale" hidden>
+              Discovery has changed since this result was created. Re-run analysis to refresh it.
+            </div>
+
+            <section class="analysis-block" aria-labelledby="as-is-title">
+              <div class="analysis-block-heading">
+                <span class="stage-index">01</span>
+                <div><p class="eyebrow">Process Analyst</p><h3 id="as-is-title">AS-IS Analysis</h3></div>
+              </div>
+              <p class="analysis-summary" id="analysis-summary"></p>
+              <div class="analysis-grid">
+                <article><h4>Bottlenecks</h4><div class="result-list" data-analysis-list="bottlenecks"></div></article>
+                <article><h4>Manual handoffs</h4><div class="result-list" data-analysis-list="manual_handoffs"></div></article>
+                <article><h4>Duplicate work</h4><div class="result-list" data-analysis-list="duplicate_work"></div></article>
+                <article><h4>Policy / practice gaps</h4><div class="result-list" data-analysis-list="policy_practice_gaps"></div></article>
+                <article class="wide"><h4>Unresolved questions</h4><div class="result-list" data-analysis-list="unresolved_questions"></div></article>
+              </div>
+            </section>
+
+            <section class="analysis-block" aria-labelledby="opportunities-title">
+              <div class="analysis-block-heading">
+                <span class="stage-index">02</span>
+                <div><p class="eyebrow">Automation Designer</p><h3 id="opportunities-title">Automation Opportunities</h3></div>
+              </div>
+              <p class="proposal-objective" id="proposal-objective"></p>
+              <div class="recommendation-list" id="recommendation-list"></div>
+            </section>
+
+            <section class="analysis-block" aria-labelledby="to-be-title">
+              <div class="analysis-block-heading">
+                <span class="stage-index">03</span>
+                <div><p class="eyebrow">Designed workflow</p><h3 id="to-be-title">TO-BE Process</h3></div>
+              </div>
+              <div class="to-be-list" id="to-be-list"></div>
+            </section>
+
+            <section class="analysis-block" aria-labelledby="verification-title">
+              <div class="analysis-block-heading">
+                <span class="stage-index">04</span>
+                <div><p class="eyebrow">Evidence Verifier</p><h3 id="verification-title">Verification</h3></div>
+              </div>
+              <div class="verification-summary" id="verification-summary"></div>
+              <div class="verification-list" id="verification-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <div class="section-divider" role="separator" aria-label="Engineering validation">
+          <span>Engineering validation</span>
+          <p>Read-only evidence that the product behavior is tested, measured, and reviewable.</p>
+        </div>
+
+        <section class="evaluation-section" id="evaluation-section" aria-labelledby="evaluation-title">
+          <header class="analysis-header">
+            <div>
+              <p class="eyebrow">Behavioral regression suite</p>
+              <h2 id="evaluation-title">AI Evaluation</h2>
+              <p class="section-helper">Evaluations run offline from the developer CLI. This is the latest saved behavioral regression report; visitors cannot trigger paid evaluation runs.</p>
+            </div>
+            <span class="process-status" id="evaluation-status">Checking latest report</span>
+          </header>
+          <div class="evaluation-empty" id="evaluation-empty" hidden>
+            <div class="empty-symbol" aria-hidden="true">E</div>
+            <div>
+              <h3>No evaluation run available yet.</h3>
+              <p>Evaluation runs are intentionally developer-operated from the CLI.</p>
+            </div>
+          </div>
+          <div class="evaluation-content" id="evaluation-content" hidden>
+            <div class="evaluation-meta" id="evaluation-meta"></div>
+            <div class="evaluation-disclaimer" id="evaluation-disclaimer"></div>
+            <div class="evaluation-grid">
+              <section>
+                <h3>Metric summaries</h3>
+                <div class="evaluation-metrics" id="evaluation-metrics"></div>
+              </section>
+              <section>
+                <h3>Scenario results</h3>
+                <div class="evaluation-scenarios" id="evaluation-scenarios"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <template id="assistant-message-template">
+      <article class="chat-message assistant-message">
+        <div class="message-content">
+          <div class="message-meta"><strong>Discovery agent</strong><span>Now</span></div>
+          <div class="message-body markdown-body"></div>
+        </div>
+      </article>
+    </template>
+
+    <template id="user-message-template">
+      <article class="chat-message user-message">
+        <div class="message-content">
+          <div class="message-meta"><strong>You</strong><span>Now</span></div>
+          <div class="message-body"></div>
+        </div>
+      </article>
+    </template>
+
+    <template id="trace-turn-template">
+      <section class="trace-turn">
+        <header class="trace-turn-header">
+          <h3></h3>
+          <span class="trace-turn-status">In progress</span>
+        </header>
+        <div class="trace-turn-events"></div>
+      </section>
+    </template>
+
+    <template id="activity-template">
+      <article class="activity-item">
+        <div class="timeline-rail"><span class="timeline-node"></span></div>
+        <div class="activity-entry">
+          <p class="trace-sentence"></p>
+          <details class="technical-details">
+            <summary>Technical details <span aria-hidden="true">⌄</span></summary>
+            <dl class="event-fields"></dl>
+            <details class="raw-event">
+              <summary>Raw event JSON</summary>
+              <pre></pre>
+            </details>
+          </details>
+        </div>
+      </article>
+    </template>
+  </body>
+</html>

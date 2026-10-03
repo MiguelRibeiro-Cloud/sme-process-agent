@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>SMOKE:RUNNING</title>
+    <script>
+      window.addEventListener("error", (event) => { document.title = `SMOKE:ERROR:${event.message}`; });
+      window.addEventListener("unhandledrejection", (event) => { document.title = `SMOKE:ERROR:${event.reason?.message || event.reason}`; });
+      window.confirm = () => true;
+      class FakeEventSource {
+        static instances = [];
+        constructor() {
+          const stream = new TransformStream();
+          this.body = stream.readable;
+          this.writer = stream.writable.getWriter();
+          this.queue = Promise.resolve();
+          FakeEventSource.instances.push(this);
+        }
+        emit(event) {
+          this.queue = this.queue.then(() => this.writer.write(
+            new TextEncoder().encode(`data: ${JSON.stringify(event)}\n\n`)
+          ));
+          if (event.type === "interaction_completed") {
+            this.queue = this.queue.then(() => this.writer.close());
+          }
+        }
+        close() { this.queue = this.queue.then(() => this.writer.close()).catch(() => {}); }
+      }
+      window.fetch = async (url) => {
+        const path = String(url);
+        if (path.includes("runtime-status")) return { ok: true, json: async () => ({ model: "test-model" }) };
+        if (path.includes("mcp-status")) return { ok: true, json: async () => ({ connected: true, tools_discovered: 2, tools: [{ name: "crm_get_customer", description: "Look up a customer in the company's CRM by customer name." }, { name: "pricing_get_product", description: "Look up product details and standard price by SKU." }], server: "Northstar Business Systems", transport: "stdio" }) };
+        if (path.includes("rag-status")) return { ok: true, json: async () => ({ available: true, embedding_model: "text-embedding-3-small", documents: 3, chunks: 14, stale: false }) };
+        if (path.includes("knowledge-catalog")) return { ok: true, json: async () => ({ available: true, documents: [{ title: "Commercial Discount Policy", filename: "discount_policy.md", chunk_count: 4, topics: "discount approval rules, approver roles, required controls" }, { title: "Northstar Quote Process", filename: "quote_process.md", chunk_count: 5, topics: "quote preparation, approvals, issuance and process recording" }, { title: "Product Operations Guidelines", filename: "product_guidelines.md", chunk_count: 5, topics: "operational product guidance and quote-related handling" }] }) };
+        if (path.includes("reset-discovery")) return { ok: true, json: async () => ({ state: {} }) };
+        if (path.endsWith("/analysis")) return { ok: true, json: async () => ({ status: "not_available", result: null, stale: false }) };
+        if (path.includes("analyze-process")) {
+          const result = {
+            process_state_fingerprint: "abc", model: "test-model", created_at: "2026-10-03T12:00:00Z", stale: false,
+            analysis: { summary: "The process contains a manual handoff.", findings: [{ finding_id: "finding-1", category: "manual_handoff", description: "Sales hands data to John.", basis: "reported_fact", supporting_evidence_ids: ["evidence-001"], related_steps: ["Sales emails John"] }], bottlenecks: [], manual_handoffs: ["Sales to John"], duplicate_work: ["Quote data is entered twice"], policy_practice_gaps: [], automation_candidates: ["Structured transfer"], unresolved_questions: ["Confirm write API"] },
+            proposal: { objective: "Reduce duplicate entry.", recommendations: [{ recommendation_id: "recommendation-1", title: "Transfer quote data", description: "Replace email transfer.", addresses_finding_ids: ["finding-1"], proposed_automation: "Send structured data.", human_control: "Sales confirms submission.", dependencies: ["Write API"], risks: ["Mapping errors"], supporting_evidence_ids: ["evidence-001"] }], to_be_steps: [{ order: 1, description: "Sales confirms the quote.", automation_level: "human_controlled", human_owner: "Sales" }, { order: 2, description: "System transfers data.", automation_level: "automated", human_owner: null }], retained_human_decisions: ["Quote confirmation"], assumptions: ["Write API exists"] },
+            verification: { verifications: [{ recommendation_id: "recommendation-1", status: "unsupported", explanation: "A write API has not been evidenced.", supporting_evidence_ids: [], missing_information: ["Confirm write API"] }], approved_recommendation_ids: [], rejected_recommendation_ids: ["recommendation-1"], unresolved_recommendation_ids: [] }
+          };
+          const events = [
+            { type: "orchestration_started", model: "test-model", stage: "orchestration", process_state_fingerprint: "abc", snapshot_counts: { steps: 1, evidence: 1 } },
+            { type: "analysis_started", model: "test-model", stage: "analysis" },
+            { type: "analysis_completed", model: "test-model", stage: "analysis", status: "success", finding_count: 1, referenced_evidence_ids: ["evidence-001"], structured_output: result.analysis },
+            { type: "automation_design_started", model: "test-model", stage: "automation_design" },
+            { type: "automation_design_completed", model: "test-model", stage: "automation_design", status: "success", recommendation_count: 1, retained_human_decision_count: 1, referenced_evidence_ids: ["evidence-001"], structured_output: result.proposal },
+            { type: "verification_started", model: "test-model", stage: "verification" },
+            { type: "verification_completed", model: "test-model", stage: "verification", status: "success", status_counts: { supported: 0, partially_supported: 0, unsupported: 1, blocked_by_unknown: 0 }, referenced_evidence_ids: [], structured_output: result.verification },
+            { type: "orchestration_completed", model: "test-model", stage: "orchestration", status: "success", process_state_fingerprint: "abc", result }
+          ];
+          const payload = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("");
+          const body = new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode(payload)); controller.close(); } });
+          return { ok: true, body };
+        }
+        if (path.includes("process-state")) return { ok: true, json: async () => ({ process_name: "Quote approval", actors: ["Sales", "Marta", "Eric"], systems: ["QuoteX"], flow: { steps: [{ step_id: "prepare", description: "Sales prepares quote", actor: "Sales", system: null }, { step_id: "marta", description: "Marta approves", actor: "Marta", system: null }, { step_id: "eric", description: "Eric reviews", actor: "Eric", system: "QuoteX" }], decisions: [{ decision_id: "threshold", question: "Which discount route applies?", after_step_id: "prepare", branches: [{ condition: "Below 15%", next_step_ids: ["marta"] }, { condition: "15% or above", next_step_ids: ["eric"] }] }] }, pain_points: [], evidence: [], conflicts: [], unknowns: [] }) };
+        if (path.includes("chat-stream")) {
+          const stream = new FakeEventSource();
+          return { ok: true, body: stream.body };
+        }
+        return { ok: true, json: async () => ({}) };
+      };
+    </script>
+  </head>
+  <body>
+    <span id="session-label"></span><span id="action-hint"></span>
+    <span id="connection-state"><i></i><span></span></span><span id="event-count"></span>
+    <strong id="runtime-model"></strong>
+    <details id="mcp-status"><summary><span id="mcp-status-label"></span></summary></details>
+    <span id="mcp-server-name"></span><span id="mcp-transport"></span><ul id="mcp-tool-list"></ul>
+    <details id="rag-status"><summary><span id="rag-status-label"></span></summary></details>
+    <span id="rag-model"></span><span id="rag-index-detail"></span><ul id="knowledge-catalog"></ul>
+    <form id="chat-form"><textarea id="message-input"></textarea><button id="send-button"><span id="send-button-label"></span></button></form>
+    <button id="reset-discovery" type="button">Reset</button>
+    <button id="analyze-process" type="button">Analyze</button>
+    <article class="conversation-panel">
+      <details id="demo-guide"><summary>Demo Guide</summary><div>
+        <p>Northstar is a fictional industrial company. CRM, pricing and company documents contain synthetic data.</p>
+        <button class="prompt-suggestion" type="button" data-prompt="My sales team takes too long to build quotes." aria-label="Fill composer with the start discovery prompt">Start discovery</button>
+        <button class="prompt-suggestion" type="button" data-prompt="Who owns Acme Ltd?" aria-label="Fill composer with the MCP capability prompt">Exercise MCP</button>
+        <dl class="architecture-legend"><div><dt>MCP</dt><dd>Interact with structured business systems and tools.</dd></div><div><dt>Knowledge / RAG</dt><dd>Search unstructured company knowledge semantically.</dd></div></dl>
+      </div></details>
+      <div id="conversation"><div id="conversation-intro"></div></div>
+    </article>
+    <p id="evaluation-explanation">Evaluations run offline from the developer CLI. Visitors cannot trigger paid evaluation runs.</p>
+    <div id="activity-feed"><div id="activity-empty"></div></div>
+    <span id="process-status"></span><div id="process-empty"></div><div id="process-model" hidden><span id="process-name"></span>
+      <section class="knowledge-card" data-field="flow"><div class="knowledge-list"></div></section>
+      <section class="knowledge-card" data-field="evidence"><div class="knowledge-list"></div></section>
+      <section class="knowledge-card" data-field="conflicts"><div class="knowledge-list"></div></section>
+    </div>
+    <span id="analysis-status"></span><div id="analysis-empty"></div><div id="analysis-content" hidden>
+      <div id="analysis-stale" hidden></div><p id="analysis-summary"></p><p id="proposal-objective"></p>
+      <div data-analysis-list="bottlenecks"></div><div data-analysis-list="manual_handoffs"></div><div data-analysis-list="duplicate_work"></div><div data-analysis-list="policy_practice_gaps"></div><div data-analysis-list="unresolved_questions"></div>
+      <div id="recommendation-list"></div><div id="to-be-list"></div><div id="verification-summary"></div><div id="verification-list"></div>
+    </div>
+
+    <template id="assistant-message-template"><article class="chat-message assistant-message"><div class="message-content"><div class="message-body markdown-body"></div></div></article></template>
+    <template id="user-message-template"><article class="chat-message user-message"><div class="message-content"><div class="message-body"></div></div></article></template>
+    <template id="trace-turn-template"><section class="trace-turn"><header><h3></h3><span class="trace-turn-status"></span></header><div class="trace-turn-events"></div></section></template>
+    <template id="activity-template"><article class="activity-item"><div class="timeline-rail"><span class="timeline-node"></span></div><div class="activity-entry"><p class="trace-sentence"></p><details class="technical-details"><summary>Technical details <span>⌄</span></summary><dl class="event-fields"></dl><details class="raw-event"><summary>Raw event JSON</summary><pre></pre></details></details></div></article></template>
+
+    <script src="../frontend/app.js"></script>
+    <script>
+      window.addEventListener("load", async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const eventSourcesBeforeSuggestion = FakeEventSource.instances.length;
+        document.querySelector('.prompt-suggestion').click();
+        const suggestionFillsOnly = document.querySelector('#message-input').value === "My sales team takes too long to build quotes." && FakeEventSource.instances.length === eventSourcesBeforeSuggestion;
+        document.querySelector('#demo-guide').open = true;
+        const guideRenders = document.querySelector('#demo-guide').textContent.includes("Demo Guide");
+        const disclosureVisible = document.querySelector('#demo-guide').textContent.includes("fictional industrial company") && document.querySelector('#demo-guide').textContent.includes("synthetic data");
+        const legendDistinguishesCapabilities = document.querySelector('.architecture-legend').textContent.includes("structured business systems") && document.querySelector('.architecture-legend').textContent.includes("unstructured company knowledge semantically");
+        const evaluationExplained = document.querySelector('#evaluation-explanation').textContent.includes("developer CLI") && document.querySelector('#evaluation-explanation').textContent.includes("cannot trigger paid evaluation runs");
+        const catalogText = document.querySelector('#knowledge-catalog').textContent;
+        const catalogVisible = ["Commercial Discount Policy", "Northstar Quote Process", "Product Operations Guidelines"].every((title) => catalogText.includes(title)) && catalogText.includes("4 chunks");
+        const catalogDoesNotSpoilPolicy = !catalogText.includes("above 10%") && !catalogText.includes("10% or less");
+        const mcpCapabilitiesVisible = document.querySelector('#mcp-tool-list').textContent.includes("crm_get_customer") && document.querySelector('#mcp-tool-list').textContent.includes("pricing_get_product") && document.querySelector('#mcp-tool-list').textContent.includes("standard price by SKU");
+        const flowVisible = document.querySelector('[data-field="flow"]').textContent.includes("Decision: Which discount route applies?") &&
+          document.querySelector('[data-field="flow"]').textContent.includes("Below 15%") &&
+          document.querySelector('[data-field="flow"]').textContent.includes("Marta approves") &&
+          document.querySelector('[data-field="flow"]').textContent.includes("15% or above") &&
+          document.querySelector('[data-field="flow"]').textContent.includes("Eric reviews");
+        const submit = (text) => {
+          const input = document.querySelector("#message-input");
+          input.value = text;
+          input.dispatchEvent(new Event("input"));
+          document.querySelector("#chat-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+          return FakeEventSource.instances.at(-1);
+        };
+        const llmStart = { type: "llm_call_started", technology: "OpenAI Responses API", model: "test-model", operation: "discovery", purpose: "Decide" };
+        const llmDone = { type: "llm_call_completed", technology: "OpenAI Responses API", model: "test-model", operation: "discovery", status: "success" };
+
+        const first = submit("Our quote process takes too long.");
+        const guideBecomesSecondary = !document.querySelector('#demo-guide').open && document.querySelector('.conversation-panel').classList.contains('has-conversation');
+        first.emit(llmStart);
+        first.emit(llmDone);
+        first.emit({ type: "assistant_message", content: "Discounts **above 15%** need review.\n\n*Check policy* before continuing.\n\n- Capture reason\n- Confirm owner\n\n1. Review\n2. Approve\n\nUse `CRM`.\n\n<img src=x onerror=\"document.body.dataset.pwned='yes'\"><script>document.body.dataset.pwned='yes'<\/script>" });
+        first.emit({ type: "interaction_completed", status: "success" });
+        await first.queue;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const firstText = document.querySelector('[data-turn="1"]').textContent;
+        const firstMessage = document.querySelector(".assistant-message .markdown-body");
+        const markdownRendered = firstMessage.querySelector("strong")?.textContent === "above 15%" &&
+          firstMessage.querySelector("em")?.textContent === "Check policy" &&
+          firstMessage.querySelectorAll("ul li").length === 2 && firstMessage.querySelectorAll("ol li").length === 2 &&
+          firstMessage.querySelector("code")?.textContent === "CRM" && !firstMessage.textContent.includes("**above 15%**");
+        const markdownSafe = firstMessage.textContent.includes("<img src=x") && !firstMessage.querySelector("img") &&
+          !firstMessage.querySelector("script") && document.body.dataset.pwned !== "yes";
+        const lifecyclePaired = document.querySelectorAll('[data-turn="1"] .activity-item').length === 2 &&
+          document.querySelector('[data-turn="1"] .raw-event pre').textContent.includes('"started"');
+
+        const second = submit("Asking Marta for approvals is the slowest part.");
+        const persisted = document.querySelectorAll(".trace-turn").length === 2 && document.querySelector('[data-turn="1"]').textContent === firstText;
+        second.emit({ type: "rag_retrieval_started", technology: "Application-owned RAG", query: "discount approval thresholds", top_k: 3 });
+        second.emit({ type: "rag_query_embedded", technology: "OpenAI Embeddings API", embedding_model: "text-embedding-3-small", query: "discount approval thresholds" });
+        second.emit({ type: "rag_retrieval_completed", technology: "Plain Python cosine similarity", status: "success", query: "discount approval thresholds", embedding_model: "text-embedding-3-small", index_chunk_count: 14, top_k: 3, results: [{ document_title: "Commercial Discount Policy", chunk_id: "discount-abc", similarity_score: 0.923, text: "Approval above 10%." }] });
+        second.emit({ type: "rag_evidence_supplied", technology: "OpenAI Responses API", model: "test-model", documents: ["Commercial Discount Policy"], chunk_ids: ["discount-abc"] });
+        second.emit({ type: "future_event", unsafe: "<img src=x>" });
+        second.emit({ type: "assistant_message", content: "Which approvals does Marta handle?" });
+        second.emit({ type: "process_state_updated", patch: { actors_to_add: ["Marta"], evidence_to_add: [{}], conflicts_to_add: [{}], unknowns_to_add: ["Which approvals does Marta handle?"] }, state: { actors: ["Marta"], systems: [], steps: [], decisions: [], pain_points: [], evidence: [{ source_type: "document", source: "discount_policy.md", document_title: "Commercial Discount Policy", chunk_id: "discount-abc", claim: "Approval is required above 10%." }], conflicts: [{ topic: "Approval threshold", first_claim: "Above 15%", first_source: "User interview", second_claim: "Above 10%", second_source: "Commercial Discount Policy", status: "unresolved" }], unknowns: ["Which approvals does Marta handle?"] } });
+        second.emit({ type: "interaction_completed", status: "success" });
+        await second.queue;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const appendedToSecond = document.querySelector('[data-turn="2"]').textContent.includes("Marta");
+        const unknownSafe = document.querySelector('[data-turn="2"]').textContent.includes("Future Event") && !document.querySelector('[data-turn="2"] img');
+        const ragVisible = document.querySelector('[data-turn="2"]').textContent.includes("14 indexed Northstar document chunks") && document.querySelector('[data-turn="2"]').textContent.includes("Commercial Discount Policy");
+        const provenanceVisible = document.querySelector('[data-field="evidence"]').textContent.includes("discount_policy.md") && document.querySelector('[data-field="conflicts"]').textContent.includes("Approval threshold");
+
+        const third = submit("Who owns Acme Ltd?");
+        third.emit(llmStart);
+        third.emit(llmDone);
+        third.emit({ type: "tool_call_requested", model: "test-model", tool: "crm_get_customer", arguments: { customer_name: "Acme Ltd" } });
+        third.emit({ type: "mcp_tool_call_started", technology: "Model Context Protocol", server: "Northstar Business Systems", transport: "stdio", tool: "crm_get_customer", arguments: { customer_name: "Acme Ltd" } });
+        third.emit({ type: "mcp_tool_call_completed", technology: "Model Context Protocol", server: "Northstar Business Systems", transport: "stdio", tool: "crm_get_customer", status: "success", result_summary: "Record C-1042 found" });
+        third.emit({ type: "assistant_message", content: "Acme Ltd is owned by Sarah Chen." });
+        third.emit({ type: "interaction_completed", status: "success" });
+        await third.queue;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const threeTurnsPersist = document.querySelectorAll(".trace-turn").length === 3 && document.querySelectorAll(".chat-message").length === 6;
+        const mcpVisible = document.querySelector('[data-turn="3"]').textContent.includes("Northstar Business Systems returned a result from crm_get_customer through MCP");
+        const details = document.querySelector(".technical-details");
+        details.querySelector(":scope > summary").click();
+        const toggleWorks = details.open;
+
+        document.querySelector("#analyze-process").click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const orchestrationVisible = document.querySelectorAll(".trace-turn").length === 4 && document.querySelector('[data-turn="4"]').textContent.includes("Evidence Verifier");
+        const rejectedVisible = document.querySelector("#recommendation-list").textContent.includes("Unsupported") && document.querySelector("#verification-list").textContent.includes("write API has not been evidenced");
+        const recommendationDisclosure = document.querySelector(".recommendation-disclosure");
+        recommendationDisclosure.querySelector(":scope > summary").click();
+        const recommendationDetailsVisible = recommendationDisclosure.open && recommendationDisclosure.textContent.includes("Write API") && recommendationDisclosure.textContent.includes("Mapping errors") && recommendationDisclosure.textContent.includes("evidence-001");
+        const toBeVisible = document.querySelector("#to-be-list").textContent.includes("System transfers data") &&
+          document.querySelector("#to-be-list").textContent.includes("Human Controlled") && document.querySelector("#to-be-list").textContent.includes("Automated");
+        const humanOwnerNormal = document.querySelector("#to-be-list").textContent.includes("Human owner: Sales") && !document.querySelector("#to-be-list").textContent.includes("&#x48;");
+        document.querySelector("#reset-discovery").click();
+        await Promise.resolve();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const resetClears = document.querySelectorAll(".trace-turn").length === 0 && Boolean(document.querySelector("#activity-empty")) &&
+          document.querySelectorAll(".chat-message").length === 0 && document.querySelector("#process-model").hidden &&
+          document.querySelector("#analysis-content").hidden && document.querySelector("#recommendation-list").children.length === 0;
+        const modelLoaded = document.querySelector("#runtime-model").textContent === "test-model";
+        const ragStatusLoaded = document.querySelector("#rag-status-label").textContent === "Knowledge: Ready" && document.querySelector("#rag-index-detail").textContent.includes("3 documents · 14 chunks");
+        document.title = [suggestionFillsOnly, guideBecomesSecondary, guideRenders, disclosureVisible, legendDistinguishesCapabilities, evaluationExplained, catalogVisible, catalogDoesNotSpoilPolicy, mcpCapabilitiesVisible, markdownRendered, markdownSafe, lifecyclePaired, persisted, appendedToSecond, unknownSafe, ragVisible, provenanceVisible, threeTurnsPersist, mcpVisible, toggleWorks, orchestrationVisible, rejectedVisible, recommendationDetailsVisible, toBeVisible, humanOwnerNormal, flowVisible, resetClears, modelLoaded, ragStatusLoaded].every(Boolean) ? "SMOKE:PASS" : "SMOKE:FAIL";
+      });
+    </script>
+  </body>
+</html>

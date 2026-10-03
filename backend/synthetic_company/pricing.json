@@ -1,0 +1,20 @@
+[
+  {
+    "sku": "NX-440",
+    "name": "Industrial Sensor",
+    "standard_price": 1250.00,
+    "currency": "EUR"
+  },
+  {
+    "sku": "SV-200",
+    "name": "Annual Maintenance Package",
+    "standard_price": 480.00,
+    "currency": "EUR"
+  },
+  {
+    "sku": "GW-810",
+    "name": "Gateway Controller",
+    "standard_price": 2100.00,
+    "currency": "EUR"
+  }
+]

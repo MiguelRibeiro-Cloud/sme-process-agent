@@ -1,0 +1,16 @@
+[
+  {
+    "customer_id": "C-1042",
+    "name": "Acme Ltd",
+    "industry": "Manufacturing",
+    "account_tier": "Enterprise",
+    "account_owner": "Sarah Chen"
+  },
+  {
+    "customer_id": "C-2077",
+    "name": "Brightline Logistics",
+    "industry": "Logistics",
+    "account_tier": "Standard",
+    "account_owner": "David Morgan"
+  }
+]
