@@ -134,13 +134,27 @@
         const llmDone = { type: "llm_call_completed", technology: "OpenAI Responses API", model: "test-model", operation: "discovery", status: "success" };
 
         const first = submit("Our quote process takes too long.");
+        const awaitingResponseLocksComposer = document.querySelector('#message-input').disabled && document.querySelector('#send-button').disabled;
         const guideBecomesSecondary = !document.querySelector('#demo-guide').open && document.querySelector('.conversation-panel').classList.contains('has-conversation');
         first.emit(llmStart);
         first.emit(llmDone);
         first.emit({ type: "assistant_message", content: "Discounts **above 15%** need review.\n\n*Check policy* before continuing.\n\n- Capture reason\n- Confirm owner\n\n1. Review\n2. Approve\n\nUse `CRM`.\n\n<img src=x onerror=\"document.body.dataset.pwned='yes'\"><script>document.body.dataset.pwned='yes'<\/script>" });
+        await first.queue;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const firstDraft = "I can prepare this follow-up while extraction runs.";
+        const firstInput = document.querySelector('#message-input');
+        firstInput.value = firstDraft;
+        firstInput.dispatchEvent(new Event('input'));
+        firstInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const processUpdateAllowsTypingOnly = !firstInput.disabled && document.querySelector('#send-button').disabled &&
+          document.querySelector('#action-hint').textContent === 'Updating process model…' &&
+          firstInput.value === firstDraft && FakeEventSource.instances.length === 1;
+        first.emit({ type: "process_state_updated", patch: { actors_to_add: ["Sales"] }, state: { actors: ["Sales"], systems: [], flow: { steps: [], decisions: [] }, pain_points: [], evidence: [], conflicts: [], unknowns: [] } });
         first.emit({ type: "interaction_completed", status: "success" });
         await first.queue;
         await new Promise((resolve) => setTimeout(resolve, 0));
+        const successfulExtractionRestoresSubmission = !firstInput.disabled && !document.querySelector('#send-button').disabled && firstInput.value === firstDraft;
         const firstText = document.querySelector('[data-turn="1"]').textContent;
         const firstMessage = document.querySelector(".assistant-message .markdown-body");
         const markdownRendered = firstMessage.querySelector("strong")?.textContent === "above 15%" &&
@@ -149,7 +163,7 @@
           firstMessage.querySelector("code")?.textContent === "CRM" && !firstMessage.textContent.includes("**above 15%**");
         const markdownSafe = firstMessage.textContent.includes("<img src=x") && !firstMessage.querySelector("img") &&
           !firstMessage.querySelector("script") && document.body.dataset.pwned !== "yes";
-        const lifecyclePaired = document.querySelectorAll('[data-turn="1"] .activity-item').length === 2 &&
+        const lifecyclePaired = document.querySelectorAll('[data-turn="1"] .activity-item').length === 3 &&
           document.querySelector('[data-turn="1"] .raw-event pre').textContent.includes('"started"');
 
         const second = submit("Asking Marta for approvals is the slowest part.");
@@ -185,9 +199,27 @@
         details.querySelector(":scope > summary").click();
         const toggleWorks = details.open;
 
+        const extractionFailure = submit("This response will keep my next draft.");
+        extractionFailure.emit({ type: "assistant_message", content: "I captured the response, but structured extraction is still running." });
+        await extractionFailure.queue;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const failureDraft = "Keep this draft after extraction fails.";
+        const failureInput = document.querySelector('#message-input');
+        failureInput.value = failureDraft;
+        failureInput.dispatchEvent(new Event('input'));
+        extractionFailure.emit({ type: "llm_call_started", technology: "OpenAI Responses API", model: "test-model", operation: "state_extraction", purpose: "Extract" });
+        extractionFailure.emit({ type: "llm_call_completed", technology: "OpenAI Responses API", model: "test-model", operation: "state_extraction", status: "error" });
+        extractionFailure.emit({ type: "agent_error", code: "state_extraction_invalid", stage: "state_extraction" });
+        extractionFailure.emit({ type: "interaction_completed", status: "partial" });
+        await extractionFailure.queue;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        const failedExtractionRestoresSubmission = !failureInput.disabled && !document.querySelector('#send-button').disabled &&
+          failureInput.value === failureDraft && document.querySelector('[data-turn="4"]').textContent.includes('Structured process extraction needs another turn') &&
+          document.querySelector('#action-hint').textContent.includes('extraction needs attention');
+
         document.querySelector("#analyze-process").click();
         await new Promise((resolve) => setTimeout(resolve, 20));
-        const orchestrationVisible = document.querySelectorAll(".trace-turn").length === 4 && document.querySelector('[data-turn="4"]').textContent.includes("Evidence Verifier");
+        const orchestrationVisible = document.querySelectorAll(".trace-turn").length === 5 && document.querySelector('[data-turn="5"]').textContent.includes("Evidence Verifier");
         const rejectedVisible = document.querySelector("#recommendation-list").textContent.includes("Unsupported") && document.querySelector("#verification-list").textContent.includes("write API has not been evidenced");
         const recommendationDisclosure = document.querySelector(".recommendation-disclosure");
         recommendationDisclosure.querySelector(":scope > summary").click();
@@ -200,10 +232,11 @@
         await new Promise((resolve) => setTimeout(resolve, 0));
         const resetClears = document.querySelectorAll(".trace-turn").length === 0 && Boolean(document.querySelector("#activity-empty")) &&
           document.querySelectorAll(".chat-message").length === 0 && document.querySelector("#process-model").hidden &&
-          document.querySelector("#analysis-content").hidden && document.querySelector("#recommendation-list").children.length === 0;
+          document.querySelector("#analysis-content").hidden && document.querySelector("#recommendation-list").children.length === 0 &&
+          document.querySelector('#message-input').value === '' && document.querySelector('#send-button').disabled;
         const modelLoaded = document.querySelector("#runtime-model").textContent === "test-model";
         const ragStatusLoaded = document.querySelector("#rag-status-label").textContent === "Knowledge: Ready" && document.querySelector("#rag-index-detail").textContent.includes("3 documents · 14 chunks");
-        document.title = [suggestionFillsOnly, guideBecomesSecondary, guideRenders, disclosureVisible, legendDistinguishesCapabilities, evaluationExplained, catalogVisible, catalogDoesNotSpoilPolicy, mcpCapabilitiesVisible, markdownRendered, markdownSafe, lifecyclePaired, persisted, appendedToSecond, unknownSafe, ragVisible, provenanceVisible, threeTurnsPersist, mcpVisible, toggleWorks, orchestrationVisible, rejectedVisible, recommendationDetailsVisible, toBeVisible, humanOwnerNormal, flowVisible, resetClears, modelLoaded, ragStatusLoaded].every(Boolean) ? "SMOKE:PASS" : "SMOKE:FAIL";
+        document.title = [suggestionFillsOnly, guideBecomesSecondary, guideRenders, disclosureVisible, legendDistinguishesCapabilities, evaluationExplained, catalogVisible, catalogDoesNotSpoilPolicy, mcpCapabilitiesVisible, awaitingResponseLocksComposer, processUpdateAllowsTypingOnly, successfulExtractionRestoresSubmission, markdownRendered, markdownSafe, lifecyclePaired, persisted, appendedToSecond, unknownSafe, ragVisible, provenanceVisible, threeTurnsPersist, mcpVisible, toggleWorks, failedExtractionRestoresSubmission, orchestrationVisible, rejectedVisible, recommendationDetailsVisible, toBeVisible, humanOwnerNormal, flowVisible, resetClears, modelLoaded, ragStatusLoaded].every(Boolean) ? "SMOKE:PASS" : "SMOKE:FAIL";
       });
     </script>
   </body>

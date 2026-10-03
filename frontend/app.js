@@ -60,6 +60,7 @@
 
   const state = {
     source: null,
+    composerPhase: "ready",
     eventCount: 0,
     interactionComplete: false,
     turnCount: 0,
@@ -128,7 +129,7 @@
   function submitMessage(event) {
     event.preventDefault();
     const message = elements.messageInput.value.trim();
-    if (!message || state.source) return;
+    if (!message || state.composerPhase !== "ready") return;
     appendUserMessage(message);
     elements.messageInput.value = "";
     resizeComposer();
@@ -387,6 +388,7 @@
       fields: [["Destination", "Conversation"], ["Event type", event.type], ["Status", event.error ? "error" : "delivered"]],
       raw: event,
     });
+    if (state.composerPhase === "awaiting_assistant") setProcessModelUpdatingState();
   }
 
   function renderProcessStateUpdated(event) {
@@ -599,6 +601,7 @@
   function finishInteraction(hint, isError) {
     state.source?.close();
     state.source = null;
+    state.composerPhase = "ready";
     elements.messageInput.disabled = false;
     elements.conversation.setAttribute("aria-busy", "false");
     elements.activityFeed.setAttribute("aria-busy", "false");
@@ -613,6 +616,7 @@
   }
 
   function setRunningState(hint = "Receiving backend events") {
+    state.composerPhase = "awaiting_assistant";
     elements.messageInput.disabled = true;
     elements.conversation.setAttribute("aria-busy", "true");
     elements.activityFeed.setAttribute("aria-busy", "true");
@@ -623,6 +627,15 @@
     elements.resetDiscovery.disabled = true;
     if (elements.analyzeProcess) elements.analyzeProcess.disabled = true;
     setConnectionState("connected", "Connecting");
+  }
+
+  function setProcessModelUpdatingState() {
+    state.composerPhase = "updating_process_model";
+    elements.messageInput.disabled = false;
+    elements.sendButtonLabel.textContent = "Updating";
+    elements.actionHint.textContent = "Updating process model…";
+    updateSendAvailability();
+    elements.messageInput.focus();
   }
 
   async function loadSessionViews() {
@@ -863,6 +876,10 @@
       state.turnCount = 0;
       state.currentTurn = null;
       state.lifecycleRows = new Map();
+      state.composerPhase = "ready";
+      elements.messageInput.value = "";
+      resizeComposer();
+      updateSendAvailability();
       elements.conversation.setAttribute("aria-busy", "false");
       elements.activityFeed.setAttribute("aria-busy", "false");
       elements.eventCount.textContent = "0 events";
@@ -1352,7 +1369,7 @@
   }
 
   function updateSendAvailability() {
-    elements.sendButton.disabled = Boolean(state.source) || !elements.messageInput.value.trim();
+    elements.sendButton.disabled = state.composerPhase !== "ready" || !elements.messageInput.value.trim();
   }
 
   function resizeComposer() {
