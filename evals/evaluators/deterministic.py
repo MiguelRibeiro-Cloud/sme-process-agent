@@ -132,6 +132,11 @@ def _state_has_no_numbers(e: EvalCriterionExpectation, a: EvalArtifacts) -> Crit
     return _result(e, not numbers, f"Numeric tokens in ProcessState: {numbers or 'none'}.")
 
 
+def _state_unchanged(e: EvalCriterionExpectation, a: EvalArtifacts) -> CriterionResult:
+    unchanged = a.state_after == a.state_before
+    return _result(e, unchanged, f"ProcessState unchanged: {unchanged}.")
+
+
 def _state_systems_include(e: EvalCriterionExpectation, a: EvalArtifacts) -> CriterionResult:
     actual = {value.casefold() for value in a.state_after.systems}
     expected = {str(value).casefold() for value in e.expected}
@@ -254,6 +259,7 @@ _CHECKS: dict[str, Callable[[EvalCriterionExpectation, EvalArtifacts], Criterion
     "unresolved_conflict_min": _unresolved_conflict_min,
     "evidence_source_types": _evidence_source_types,
     "state_has_no_numbers": _state_has_no_numbers,
+    "state_unchanged": _state_unchanged,
     "state_systems_include": _state_systems_include,
     "state_excludes_text": _state_excludes_text,
     "state_unknown_contains": _state_unknown_contains,

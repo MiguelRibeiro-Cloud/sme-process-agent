@@ -12,7 +12,7 @@ from backend.agent import DiscoverySession
 from backend.config import DEFAULT_OPENAI_MODEL, resolve_openai_model
 from backend.mcp_client import MCPStartupError, MCPToolCallError
 from backend.sessions import SessionStore
-from backend.state import ProcessStatePatch
+from backend.state import ProcessBranch, ProcessDecision, ProcessStatePatch, ProcessStep
 
 
 MCP_TOOLS = [
@@ -95,6 +95,176 @@ class AgentEventStreamTests(unittest.TestCase):
         mcp_client.call_tool.assert_not_called()
         self.assertIs(openai_client.responses.parse.call_args.kwargs["text_format"], ProcessStatePatch)
 
+    def test_medication_question_is_redirected_without_capabilities_or_state_mutation(self):
+        redirect = (
+            "I'm here to help understand and improve business processes. Describe a workflow, "
+            "manual task, approval, handoff, bottleneck, or system your team uses."
+        )
+        mcp_client = fake_mcp()
+        session = DiscoverySession(mcp_client)
+        session._state = agent.ProcessState(actors=["Sales"])
+        before = session.state_snapshot()
+        openai_client = fake_openai(
+            create_responses=[model_response(text=redirect)],
+            patches=[ProcessStatePatch()],
+        )
+
+        events, _, _ = self.run_turn(
+            "In what interval should I take paracetamol 1000mg for a nasty headache and fever?",
+            openai_client,
+            mcp_client,
+            session,
+        )
+
+        self.assertEqual(session.state_snapshot(), before)
+        self.assertNotIn("paracetamol", next(
+            event["content"] for event in events if event["type"] == "assistant_message"
+        ).casefold())
+        mcp_client.call_tool.assert_not_called()
+        discovery_instructions = " ".join(
+            openai_client.responses.create.call_args.kwargs["instructions"].split()
+        )
+        self.assertIn(
+            "unrelated to both business-process discovery and the connected company environment",
+            discovery_instructions,
+        )
+        extraction_instructions = " ".join(
+            openai_client.responses.parse.call_args.kwargs["instructions"].split()
+        )
+        self.assertIn("return an empty patch", extraction_instructions)
+
+    def test_trivia_question_is_redirected_without_state_mutation(self):
+        openai_client = fake_openai(
+            create_responses=[model_response(
+                text="I help with business-process discovery. Please describe a workflow or bottleneck."
+            )],
+            patches=[ProcessStatePatch()],
+        )
+        session = DiscoverySession(fake_mcp())
+        before = session.state_snapshot()
+
+        events, _, mcp_client = self.run_turn(
+            "What is the capital of Mongolia?", openai_client, session=session
+        )
+
+        self.assertEqual(session.state_snapshot(), before)
+        self.assertNotIn("Ulaanbaatar", json.dumps(events))
+        mcp_client.call_tool.assert_not_called()
+
+    def test_unrelated_coding_request_is_redirected_without_state_mutation(self):
+        openai_client = fake_openai(
+            create_responses=[model_response(
+                text="I help understand and improve business processes. What workflow should we map?"
+            )],
+            patches=[ProcessStatePatch()],
+        )
+        session = DiscoverySession(fake_mcp())
+        before = session.state_snapshot()
+
+        events, _, mcp_client = self.run_turn(
+            "Write me a Python snake game.", openai_client, session=session
+        )
+
+        self.assertEqual(session.state_snapshot(), before)
+        self.assertNotIn("def ", json.dumps(events))
+        mcp_client.call_tool.assert_not_called()
+
+    def test_healthcare_business_process_remains_in_scope(self):
+        patch = ProcessStatePatch(
+            actors_to_add=["Pharmacy staff"],
+            systems_to_add=["Prescription system"],
+            pain_points_to_add=["Manual duplicate entry takes too long"],
+        )
+        openai_client = fake_openai(
+            create_responses=[model_response(text="Which two systems are involved?")],
+            patches=[patch],
+        )
+
+        _, session, mcp_client = self.run_turn(
+            "Our pharmacy staff manually copy prescription-order details into two systems and it takes too long.",
+            openai_client,
+        )
+
+        self.assertEqual(session.state_snapshot().actors, ["Pharmacy staff"])
+        self.assertEqual(session.state_snapshot().systems, ["Prescription system"])
+        mcp_client.call_tool.assert_not_called()
+
+    def test_extraction_represents_known_outcomes_without_inventing_approval_destination(self):
+        patch = ProcessStatePatch(
+            steps_to_add=[
+                ProcessStep(step_id="prepare", description="Seller prepares the quote"),
+                ProcessStep(step_id="marta-route", description="Seller routes the quote to Marta"),
+                ProcessStep(step_id="eric-route", description="Seller routes the quote to Eric"),
+                ProcessStep(step_id="services", description="Eric enters services quote values"),
+                ProcessStep(step_id="non-services", description="Eric reviews non-services quotes"),
+                ProcessStep(step_id="reject-email", description="Eric emails Marta after rejection"),
+                ProcessStep(step_id="seller-informed", description="Marta informs the seller"),
+                ProcessStep(step_id="renegotiate", description="Seller renegotiates with the customer"),
+            ],
+            decisions_to_add=[
+                ProcessDecision(
+                    decision_id="discount-route",
+                    question="Which discount route applies?",
+                    after_step_id="prepare",
+                    branches=[
+                        ProcessBranch(condition="below 15%", next_step_ids=["marta-route"]),
+                        ProcessBranch(condition="15% or more", next_step_ids=["eric-route"]),
+                    ],
+                ),
+                ProcessDecision(
+                    decision_id="quote-type",
+                    question="Is the quote for services?",
+                    after_step_id="eric-route",
+                    branches=[
+                        ProcessBranch(condition="services", next_step_ids=["services"]),
+                        ProcessBranch(condition="non-services", next_step_ids=["non-services"]),
+                    ],
+                ),
+                ProcessDecision(
+                    decision_id="eric-outcome",
+                    question="Does Eric approve or reject the quote?",
+                    after_step_id="non-services",
+                    branches=[
+                        ProcessBranch(condition="approved"),
+                        ProcessBranch(
+                            condition="rejected",
+                            next_step_ids=["reject-email", "seller-informed", "renegotiate"],
+                        ),
+                    ],
+                ),
+            ],
+            unknowns_to_add=[
+                "What happens after Eric approves the quote?",
+                "What happens after the seller renegotiates with the customer?",
+            ],
+        )
+        openai_client = fake_openai(
+            create_responses=[model_response(text="What happens after approval?")],
+            patches=[patch],
+        )
+
+        _, session, _ = self.run_turn(
+            "Eric approves or rejects the quote. If he rejects it, he emails Marta, "
+            "Marta informs the seller, and the seller renegotiates with the customer.",
+            openai_client,
+        )
+
+        decisions = {decision.decision_id: decision for decision in session.state_snapshot().flow.decisions}
+        self.assertEqual(
+            decisions["eric-outcome"].branches[0].next_step_ids,
+            [],
+        )
+        self.assertEqual(
+            decisions["eric-outcome"].branches[1].next_step_ids,
+            ["reject-email", "seller-informed", "renegotiate"],
+        )
+        self.assertEqual(len(decisions["discount-route"].branches), 2)
+        self.assertEqual(len(decisions["quote-type"].branches), 2)
+        self.assertIn(
+            "include that branch with no next_step_ids",
+            " ".join(openai_client.responses.parse.call_args.kwargs["instructions"].split()),
+        )
+
     def test_configured_model_is_used_for_discovery_and_extraction(self):
         openai_client = fake_openai(
             create_responses=[model_response(text="What happens next?")]
@@ -156,7 +326,7 @@ class AgentEventStreamTests(unittest.TestCase):
         self.assertEqual(tools[0]["description"], MCP_TOOLS[0]["description"])
         self.assertEqual(tools[0]["parameters"], MCP_TOOLS[0]["inputSchema"])
 
-    def test_crm_execution_crosses_mcp_client_boundary(self):
+    def test_connected_company_crm_lookup_remains_in_scope(self):
         result = {"customer_id": "C-1042", "name": "Acme Ltd", "account_owner": "Sarah Chen"}
         mcp_client = fake_mcp(result)
         openai_client = fake_openai(create_responses=[
@@ -165,13 +335,17 @@ class AgentEventStreamTests(unittest.TestCase):
         ])
         events, _, _ = self.run_turn("Who owns Acme Ltd?", openai_client, mcp_client)
         mcp_client.call_tool.assert_called_once_with("crm_get_customer", {"customer_name": "Acme Ltd"})
+        self.assertIn(
+            "investigating the connected company environment",
+            openai_client.responses.create.call_args_list[0].kwargs["instructions"],
+        )
         started = next(event for event in events if event["type"] == "mcp_tool_call_started")
         self.assertEqual(started["server"], "Northstar Business Systems")
         self.assertEqual(started["transport"], "stdio")
         extraction = json.loads(openai_client.responses.parse.call_args.kwargs["input"])
         self.assertEqual(extraction["actual_tool_calls"][0]["result"]["account_owner"], "Sarah Chen")
 
-    def test_pricing_execution_crosses_mcp_client_boundary(self):
+    def test_connected_company_pricing_lookup_remains_in_scope(self):
         result = {"sku": "NX-440", "name": "Industrial Sensor", "standard_price": 1250.0, "currency": "EUR"}
         mcp_client = fake_mcp(result)
         openai_client = fake_openai(create_responses=[
@@ -180,6 +354,10 @@ class AgentEventStreamTests(unittest.TestCase):
         ])
         events, _, _ = self.run_turn("What is the standard price of NX-440?", openai_client, mcp_client)
         mcp_client.call_tool.assert_called_once_with("pricing_get_product", {"sku": "NX-440"})
+        self.assertIn(
+            "investigating the connected company environment",
+            openai_client.responses.create.call_args_list[0].kwargs["instructions"],
+        )
         completed = next(event for event in events if event["type"] == "mcp_tool_call_completed")
         self.assertEqual(completed["result_metadata"]["record_identifier"], "NX-440")
 

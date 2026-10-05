@@ -98,6 +98,7 @@ The system does not silently rewrite practice to match policy or treat a documen
 
 - Conversational discovery backed by typed structured state.
 - Branch-aware AS-IS process modeling and explicit unknowns.
+- Scope-bound discovery that redirects non-process requests without retrieving data or mutating state.
 - MCP tool discovery, schema translation, validation, and execution.
 - Semantic RAG retrieval with document and chunk provenance.
 - Preserved policy/practice conflicts.

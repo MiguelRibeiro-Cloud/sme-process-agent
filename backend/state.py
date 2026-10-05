@@ -61,12 +61,12 @@ class ProcessStep(BaseModel):
 
 
 class ProcessBranch(BaseModel):
-    """An explicit route and its ordered step sequence."""
+    """An explicit route and its ordered step sequence, if a next step is known."""
 
     model_config = ConfigDict(extra="forbid")
 
     condition: StateText
-    next_step_ids: list[StateIdentifier] = Field(min_length=1)
+    next_step_ids: list[StateIdentifier] = Field(default_factory=list)
 
     @field_validator("next_step_ids")
     @classmethod

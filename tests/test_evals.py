@@ -62,7 +62,7 @@ def run_result(scenario_id="scenario", run_number=1, criteria=None, passed=True)
 class ScenarioModelTests(unittest.TestCase):
     def test_scenario_loading_is_stable_unique_and_inspectable(self):
         scenarios = load_scenarios()
-        self.assertEqual(11, len(scenarios))
+        self.assertEqual(12, len(scenarios))
         self.assertEqual(len(scenarios), len({item.scenario_id for item in scenarios}))
         self.assertTrue(all(item.expectations for item in scenarios))
         json.dumps([item.model_dump(mode="json") for item in scenarios])
@@ -125,6 +125,29 @@ class DeterministicEvaluatorTests(unittest.TestCase):
         )
         self.assertFalse(evaluate_deterministic(expected, EvalArtifacts(assistant_messages=["EUR 1,200"])).passed)
         self.assertFalse(evaluate_deterministic(expected, EvalArtifacts(assistant_messages=["USD 1,250"])).passed)
+
+    def test_unknown_check_accepts_renegotiation_word_forms_through_the_shared_root(self):
+        expected = EvalCriterionExpectation(
+            criterion_id="post-renegotiation",
+            description="Post-renegotiation uncertainty remains",
+            evaluator="deterministic",
+            check="state_unknown_contains",
+            metric="State reconciliation",
+            expected=["after", "renegotiat"],
+        )
+
+        for form in ("renegotiate", "renegotiates", "renegotiated", "renegotiation"):
+            with self.subTest(form=form):
+                result = evaluate_deterministic(
+                    expected,
+                    EvalArtifacts(
+                        state_after=ProcessState(
+                            unknowns=[f"What happens after the seller {form} with the customer?"]
+                        )
+                    ),
+                )
+
+                self.assertTrue(result.passed)
 
 
 class SemanticEvaluatorTests(unittest.TestCase):

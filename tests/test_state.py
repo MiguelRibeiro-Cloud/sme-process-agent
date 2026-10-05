@@ -206,7 +206,7 @@ class ProcessStatePatchTests(unittest.TestCase):
                 replacement=ProcessStep(step_id="other", description="Prepare in QuoteX"),
             )
 
-    def test_partially_discovered_decision_can_keep_one_supported_branch(self):
+    def test_partially_discovered_decision_can_represent_an_outcome_with_unknown_next_action(self):
         state = ProcessState(
             flow={
                 "steps": [
@@ -218,6 +218,7 @@ class ProcessStatePatchTests(unittest.TestCase):
                     "question": "What is Eric's decision?",
                     "after_step_id": "review",
                     "branches": [
+                        {"condition": "approved", "next_step_ids": []},
                         {"condition": "rejected", "next_step_ids": ["renegotiate"]}
                     ],
                 }],
@@ -226,7 +227,10 @@ class ProcessStatePatchTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            state.flow.decisions[0].branches[0].next_step_ids, ["renegotiate"]
+            state.flow.decisions[0].branches[0].next_step_ids, []
+        )
+        self.assertEqual(
+            state.flow.decisions[0].branches[1].next_step_ids, ["renegotiate"]
         )
         self.assertEqual(state.unknowns, ["What happens after approval?"])
 

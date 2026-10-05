@@ -309,6 +309,10 @@ class AgentRAGRoutingTests(unittest.TestCase):
 
         self.rag.search_company_knowledge.assert_called_once_with("discount approval thresholds", 3)
         self.mcp.call_tool.assert_not_called()
+        self.assertIn(
+            "investigating the connected company environment",
+            client.responses.create.call_args_list[0].kwargs["instructions"],
+        )
         grounded = client.responses.create.call_args_list[1].kwargs["input"][0]["output"]
         self.assertIn("Retrieved company evidence", grounded)
         self.assertIn("Commercial Discount Policy | discount_policy.md | chunk 2", grounded)
